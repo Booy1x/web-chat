@@ -7,7 +7,7 @@ async function join() {
   const code = document.getElementById('codeInput').value.trim();
   const errEl = document.getElementById('loginError');
 
-  if (!name) { errEl.textContent = '请输入昵称'; return; }
+  if (!name) { errEl.textContent = '> error: username required'; return; }
 
   // Verify access code
   try {
@@ -17,14 +17,14 @@ async function join() {
       body: JSON.stringify({ code })
     });
     const data = await res.json();
-    if (!data.ok) { errEl.textContent = '密码错误'; return; }
+    if (!data.ok) { errEl.textContent = '> error: access denied'; return; }
   } catch (e) {
-    errEl.textContent = '连接失败'; return;
+    errEl.textContent = '> error: connection failed'; return;
   }
 
   errEl.textContent = '';
   myName = name;
-  document.getElementById('currentUser').textContent = name;
+  document.getElementById('currentUser').textContent = name + '@chat';
   document.getElementById('login').style.display = 'none';
   document.getElementById('chat').style.display = 'flex';
 
@@ -42,11 +42,11 @@ function setupSocket() {
   });
 
   socket.on('online', (count) => {
-    document.getElementById('onlineCount').textContent = '在线: ' + count;
+    document.getElementById('onlineCount').textContent = 'online: ' + count;
   });
 
   socket.on('error_msg', (msg) => {
-    alert(msg);
+    appendSystemMsg(msg);
   });
 }
 
@@ -59,6 +59,7 @@ document.getElementById('codeInput').addEventListener('keydown', (e) => {
 
 // Load history
 async function loadHistory() {
+  appendSystemMsg('connected. type messages below.');
   const res = await fetch('/api/messages');
   const messages = await res.json();
   messages.forEach((m) => appendMsg(m.user, m.content, m.created_at));
@@ -84,24 +85,31 @@ function appendMsg(user, content, time) {
   const div = document.createElement('div');
   div.className = 'msg ' + (user === myName ? 'mine' : 'other');
 
-  const nameDiv = document.createElement('div');
-  nameDiv.className = 'name';
-  nameDiv.textContent = user;
-
-  const contentDiv = document.createElement('div');
-  contentDiv.textContent = content;
-
-  const timeDiv = document.createElement('div');
-  timeDiv.className = 'time';
-  timeDiv.textContent = new Date(time).toLocaleTimeString('zh-CN', {
+  const timeStr = new Date(time).toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit'
   });
 
-  div.appendChild(nameDiv);
-  div.appendChild(contentDiv);
-  div.appendChild(timeDiv);
+  div.innerHTML =
+    '<span class="time">[' + timeStr + ']</span> ' +
+    '<span class="name">' + escapeHtml(user) + '</span>' +
+    '<span class="prompt"> $ </span>' +
+    '<span class="content">' + escapeHtml(content) + '</span>';
+
   document.getElementById('messages').appendChild(div);
+}
+
+function appendSystemMsg(text) {
+  const div = document.createElement('div');
+  div.className = 'msg system';
+  div.textContent = '> ' + text;
+  document.getElementById('messages').appendChild(div);
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
 }
 
 function scrollToBottom() {

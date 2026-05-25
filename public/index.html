@@ -3,17 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat</title>
+  <title>Web Chat</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
     <!-- Login -->
     <div id="login">
-      <h2>Web Chat</h2>
-      <input id="nameInput" placeholder="输入昵称" maxlength="20" autofocus>
-      <input id="codeInput" placeholder="访问密码（如已设置）" maxlength="50" type="password">
-      <button onclick="join()">进入</button>
+      <div class="ascii-art"> ██╗    ██╗███████╗██████╗
+ ██║    ██║██╔════╝██╔══██╗
+ ██║ █╗ ██║█████╗  ██████╔╝
+ ██║███╗██║██╔══╝  ██╔══██╗
+ ╚███╔███╔╝███████╗██████╔╝
+  ╚══╝╚══╝ ╚══════╝╚═════╝</div>
+      <h2>Terminal Chat</h2>
+      <div class="prompt-line">login as: </div>
+      <input id="nameInput" placeholder="username" maxlength="20" autofocus>
+      <input id="codeInput" placeholder="access code (if required)" maxlength="50" type="password">
+      <button onclick="join()">Connect</button>
       <div id="loginError" class="error"></div>
     </div>
 
@@ -21,12 +28,13 @@
     <div id="chat" style="display:none">
       <div id="header">
         <span id="currentUser"></span>
-        <span id="onlineCount">在线: 0</span>
+        <span id="onlineCount">online: 0</span>
       </div>
       <div id="messages"></div>
       <div id="inputBar">
-        <input id="msgInput" placeholder="输入消息..." maxlength="500">
-        <button onclick="send()">发送</button>
+        <span class="prompt-symbol">$</span>
+        <input id="msgInput" placeholder="type a message..." maxlength="500">
+        <button onclick="send()">send</button>
       </div>
     </div>
   </div>
