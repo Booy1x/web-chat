@@ -12,14 +12,16 @@
     <div id="login">
       <h2>Web Chat</h2>
       <input id="nameInput" placeholder="输入昵称" maxlength="20" autofocus>
+      <input id="codeInput" placeholder="访问密码（如已设置）" maxlength="50" type="password">
       <button onclick="join()">进入</button>
+      <div id="loginError" class="error"></div>
     </div>
 
     <!-- Chat -->
     <div id="chat" style="display:none">
       <div id="header">
         <span id="currentUser"></span>
-        <span id="status">●</span>
+        <span id="onlineCount">在线: 0</span>
       </div>
       <div id="messages"></div>
       <div id="inputBar">

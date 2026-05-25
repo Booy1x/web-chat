@@ -68,6 +68,18 @@ body {
   background: #3a7bc8;
 }
 
+.error {
+  color: #e74c3c;
+  font-size: 13px;
+  min-height: 20px;
+}
+
+#onlineCount {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.9;
+}
+
 /* Chat */
 #chat {
   display: flex;

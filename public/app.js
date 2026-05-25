@@ -1,20 +1,59 @@
-const socket = io();
+let socket;
 let myName = '';
 
 // Login
-function join() {
-  const input = document.getElementById('nameInput');
-  const name = input.value.trim();
-  if (!name) return;
+async function join() {
+  const name = document.getElementById('nameInput').value.trim();
+  const code = document.getElementById('codeInput').value.trim();
+  const errEl = document.getElementById('loginError');
+
+  if (!name) { errEl.textContent = '请输入昵称'; return; }
+
+  // Verify access code
+  try {
+    const res = await fetch('/api/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    if (!data.ok) { errEl.textContent = '密码错误'; return; }
+  } catch (e) {
+    errEl.textContent = '连接失败'; return;
+  }
+
+  errEl.textContent = '';
   myName = name;
   document.getElementById('currentUser').textContent = name;
   document.getElementById('login').style.display = 'none';
   document.getElementById('chat').style.display = 'flex';
+
+  // Connect socket after auth
+  socket = io();
+  setupSocket();
   loadHistory();
   document.getElementById('msgInput').focus();
 }
 
+function setupSocket() {
+  socket.on('chat message', (data) => {
+    appendMsg(data.user, data.content, data.created_at);
+    scrollToBottom();
+  });
+
+  socket.on('online', (count) => {
+    document.getElementById('onlineCount').textContent = '在线: ' + count;
+  });
+
+  socket.on('error_msg', (msg) => {
+    alert(msg);
+  });
+}
+
 document.getElementById('nameInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('codeInput').focus();
+});
+document.getElementById('codeInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') join();
 });
 
@@ -30,7 +69,7 @@ async function loadHistory() {
 function send() {
   const input = document.getElementById('msgInput');
   const content = input.value.trim();
-  if (!content) return;
+  if (!content || !socket) return;
   socket.emit('chat message', { user: myName, content });
   input.value = '';
   input.focus();
@@ -38,12 +77,6 @@ function send() {
 
 document.getElementById('msgInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') send();
-});
-
-// Receive
-socket.on('chat message', (data) => {
-  appendMsg(data.user, data.content, data.created_at);
-  scrollToBottom();
 });
 
 // Append message
