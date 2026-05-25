@@ -1,0 +1,17 @@
+{
+  "name": "web-chat",
+  "version": "1.0.0",
+  "description": "Lightweight 1-on-1 web chat",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "socket.io": "^4.7.5",
+    "sql.js": "^1.10.3"
+  }
+}
