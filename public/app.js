@@ -314,7 +314,13 @@ document.getElementById('roomItems').addEventListener('click', (e) => {
 // ── Online Dropdown ──
 document.getElementById('onlineCount').addEventListener('click', (e) => {
   e.stopPropagation();
-  document.getElementById('roomUserList').classList.toggle('open');
+  const menu = document.getElementById('roomUserList');
+  const isOpen = menu.classList.toggle('open');
+  if (isOpen) {
+    const rect = e.target.getBoundingClientRect();
+    menu.style.top = rect.bottom + 4 + 'px';
+    menu.style.right = (window.innerWidth - rect.right) + 'px';
+  }
 });
 
 document.addEventListener('click', () => {

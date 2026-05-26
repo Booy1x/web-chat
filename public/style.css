@@ -101,9 +101,9 @@ body {
 #login .prompt-line {
   color: var(--fg-dim);
   font-size: 12px;
-  align-self: flex-start;
   max-width: 280px;
   width: 100%;
+  text-align: left;
 }
 
 #login input {
@@ -224,10 +224,7 @@ body {
 
 .dropdown-menu {
   display: none;
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
+  position: fixed;
   min-width: 140px;
   background: var(--bg-lighter);
   border: 1px solid var(--border);
