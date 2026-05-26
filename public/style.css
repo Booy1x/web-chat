@@ -90,6 +90,10 @@ body {
   text-transform: uppercase;
 }
 
+#login .robot-icon {
+  margin-bottom: -4px;
+}
+
 #login .ascii-art {
   color: var(--green);
   font-size: 11px;
