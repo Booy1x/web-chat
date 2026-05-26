@@ -119,6 +119,7 @@ io.on('connection', (socket) => {
     }
 
     roomUser = (user || '').trim();
+    if (!roomUser) return socket.emit('room error', 'username required');
     currentRoom = name;
     socket.join(name);
 
@@ -126,14 +127,15 @@ io.on('connection', (socket) => {
     const count = room.users.get(roomUser) || 0;
     room.users.set(roomUser, count + 1);
 
+    const userList = getUserList(room);
     socket.emit('room joined', {
       name,
       messages: room.messages.slice(-100),
-      onlineCount: room.users.size,
-      users: getUserList(room)
+      onlineCount: userList.length,
+      users: userList
     });
-    io.to(name).emit('online', room.users.size);
-    io.to(name).emit('user list', getUserList(room));
+    io.to(name).emit('online', userList.length);
+    io.to(name).emit('user list', userList);
     io.emit('room list', getRoomList());
   });
 
@@ -188,14 +190,15 @@ io.on('connection', (socket) => {
     }
 
     socket.leave(currentRoom);
-    io.to(currentRoom).emit('online', room.users.size);
-    io.to(currentRoom).emit('user list', getUserList(room));
+    const list = getUserList(room);
+    io.to(currentRoom).emit('online', list.length);
+    io.to(currentRoom).emit('user list', list);
     io.emit('room list', getRoomList());
   }
 });
 
 function getUserList(room) {
-  return Array.from(room.users.keys()).sort().map(name => ({ name }));
+  return Array.from(room.users.keys()).filter(n => n).sort().map(name => ({ name }));
 }
 
 function getGlobalUserList() {
