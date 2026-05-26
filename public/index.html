@@ -20,15 +20,38 @@
       <div class="prompt-line">login as: </div>
       <input id="nameInput" placeholder="username" maxlength="20" autofocus>
       <input id="codeInput" placeholder="access code (if required)" maxlength="50" type="password">
-      <button onclick="join()">Connect</button>
+      <button onclick="login()">Connect</button>
       <div id="loginError" class="error"></div>
+    </div>
+
+    <!-- Room List -->
+    <div id="roomList" style="display:none">
+      <div id="roomHeader">
+        <span id="roomUser"></span>
+        <span class="room-title">lobby</span>
+        <button id="logoutBtn" onclick="logout()">logout</button>
+      </div>
+      <div id="roomItems"></div>
+      <div id="createRoom">
+        <div class="create-label">> create room:</div>
+        <div class="create-row">
+          <input id="newRoomName" placeholder="room name" maxlength="30">
+          <input id="newRoomPass" placeholder="password (optional)" maxlength="50" type="password">
+          <button onclick="createRoom()">create</button>
+        </div>
+        <div id="roomError" class="error"></div>
+      </div>
     </div>
 
     <!-- Chat -->
     <div id="chat" style="display:none">
       <div id="header">
         <span id="currentUser"></span>
-        <span id="onlineCount">online: 0</span>
+        <span id="chatRoomName"></span>
+        <div class="header-right">
+          <span id="onlineCount">online: 0</span>
+          <button id="leaveBtn" onclick="leaveRoom()">leave</button>
+        </div>
       </div>
       <div id="messages"></div>
       <div id="inputBar">
