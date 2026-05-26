@@ -31,6 +31,10 @@ async function login() {
   socket.on('global user list', (users) => {
     renderGlobalUserList(users);
   });
+  socket.on('kicked', () => {
+    alert('Your account was logged in from another location');
+    logout();
+  });
 
   showRoomList();
 }

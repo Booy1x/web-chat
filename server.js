@@ -16,18 +16,19 @@ const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 redis.on('error', (err) => console.error('Redis error:', err.message));
 
 // In-memory room cache
-// Each room: { name, password, messages[], users: Map<username, connectionCount> }
+// Each room: { name, password, messages[] }
 let rooms = new Map();
 
-// Global online users: Map<username, Set<socketId>>
-let onlineUsers = new Map();
+// Unified presence tracking
+// presence: Map<socketId, { username, room }>
+// users:    Map<username, Set<socketId>> (reverse index)
+let presence = new Map();
+let users = new Map();
 
 async function loadRooms() {
   const data = await redis.hgetall('rooms');
   for (const [name, json] of Object.entries(data)) {
-    const room = JSON.parse(json);
-    room.users = new Map();
-    rooms.set(name, room);
+    rooms.set(name, JSON.parse(json));
   }
   console.log(`Loaded ${rooms.size} rooms from Redis`);
 }
@@ -35,14 +36,13 @@ async function loadRooms() {
 async function saveRoom(name) {
   const room = rooms.get(name);
   if (!room) return;
-  const { users, ...data } = room;
-  await redis.hset('rooms', name, JSON.stringify(data));
+  await redis.hset('rooms', name, JSON.stringify(room));
 }
 
 async function init() {
   await loadRooms();
   if (!rooms.has('general')) {
-    rooms.set('general', { name: 'general', password: '', messages: [], users: new Map() });
+    rooms.set('general', { name: 'general', password: '', messages: [] });
     await saveRoom('general');
   }
 }
@@ -59,39 +59,39 @@ app.post('/api/verify', (req, res) => {
 });
 
 app.get('/api/rooms', (req, res) => {
-  const list = [];
-  for (const [name, room] of rooms) {
-    list.push({
-      name,
-      hasPassword: !!room.password,
-      onlineCount: room.users.size,
-      messageCount: room.messages.length
-    });
-  }
-  res.json(list);
+  res.json(getRoomList());
 });
 
 // Socket.IO
 io.on('connection', (socket) => {
-  let currentRoom = null;
-  let roomUser = null;  // username in current room
-  let globalUser = null; // username for global tracking
-
   if (io.engine.clientsCount > MAX_CONNECTIONS) {
     socket.emit('error_msg', 'server is full');
     socket.disconnect(true);
     return;
   }
 
-  // Register user globally on login
+  // Register user globally, kick duplicate logins
   socket.on('set username', (name) => {
     name = (name || '').trim();
     if (!name) return;
-    globalUser = name;
-    if (!onlineUsers.has(name)) {
-      onlineUsers.set(name, new Set());
+
+    // Kick old sockets with same username
+    if (users.has(name)) {
+      for (const oldId of users.get(name)) {
+        if (oldId === socket.id) continue;
+        const oldSocket = io.sockets.sockets.get(oldId);
+        if (oldSocket) {
+          oldSocket.emit('kicked');
+          oldSocket.disconnect(true);
+        }
+      }
     }
-    onlineUsers.get(name).add(socket.id);
+
+    // Register in unified presence
+    presence.set(socket.id, { username: name, room: null });
+    if (!users.has(name)) users.set(name, new Set());
+    users.get(name).add(socket.id);
+
     io.emit('global user list', getGlobalUserList());
   });
 
@@ -101,7 +101,7 @@ io.on('connection', (socket) => {
     if (name.length > 30) return socket.emit('room error', 'name too long (max 30)');
     if (rooms.has(name)) return socket.emit('room error', 'room already exists');
 
-    rooms.set(name, { name, password: password || '', messages: [], users: new Map() });
+    rooms.set(name, { name, password: password || '', messages: [] });
     await saveRoom(name);
     io.emit('room list', getRoomList());
   });
@@ -113,21 +113,23 @@ io.on('connection', (socket) => {
       return socket.emit('room error', 'wrong password');
     }
 
+    const p = presence.get(socket.id);
+    if (!p) return socket.emit('room error', 'not logged in');
+    const roomUser = (user || '').trim();
+    if (!roomUser) return socket.emit('room error', 'username required');
+
     // Leave previous room
-    if (currentRoom) {
-      leaveCurrentRoom();
+    if (p.room) {
+      const prevRoom = p.room;
+      socket.leave(prevRoom);
+      p.room = null;
+      broadcastRoom(prevRoom);
     }
 
-    roomUser = (user || '').trim();
-    if (!roomUser) return socket.emit('room error', 'username required');
-    currentRoom = name;
+    p.room = name;
     socket.join(name);
 
-    // Track user in room
-    const count = room.users.get(roomUser) || 0;
-    room.users.set(roomUser, count + 1);
-
-    const userList = getUserList(room);
+    const userList = getRoomUserList(name);
     socket.emit('room joined', {
       name,
       messages: room.messages.slice(-100),
@@ -140,78 +142,83 @@ io.on('connection', (socket) => {
   });
 
   socket.on('leave room', () => {
-    if (!currentRoom) return;
-    leaveCurrentRoom();
-    currentRoom = null;
-    roomUser = null;
+    const p = presence.get(socket.id);
+    if (!p || !p.room) return;
+    const prevRoom = p.room;
+    socket.leave(prevRoom);
+    p.room = null;
+    broadcastRoom(prevRoom);
   });
 
   socket.on('chat message', async (data) => {
-    if (!currentRoom) return socket.emit('error_msg', 'join a room first');
+    const p = presence.get(socket.id);
+    if (!p || !p.room) return socket.emit('error_msg', 'join a room first');
     const user = (data.user || '').trim();
     const content = (data.content || '').trim();
     if (!user || !content) return;
 
-    const room = rooms.get(currentRoom);
+    const room = rooms.get(p.room);
     if (!room) return;
 
     const msg = { user, content, created_at: new Date().toISOString() };
     room.messages.push(msg);
     if (room.messages.length > 500) room.messages = room.messages.slice(-500);
 
-    io.to(currentRoom).emit('chat message', msg);
-    await saveRoom(currentRoom);
+    io.to(p.room).emit('chat message', msg);
+    await saveRoom(p.room);
   });
 
   socket.on('disconnect', () => {
-    if (currentRoom) {
-      leaveCurrentRoom();
+    const p = presence.get(socket.id);
+    if (!p) return;
+
+    // Clean up presence
+    presence.delete(socket.id);
+    if (users.has(p.username)) {
+      users.get(p.username).delete(socket.id);
+      if (users.get(p.username).size === 0) users.delete(p.username);
     }
-    // Remove from global online users
-    if (globalUser && onlineUsers.has(globalUser)) {
-      const sockets = onlineUsers.get(globalUser);
-      sockets.delete(socket.id);
-      if (sockets.size === 0) {
-        onlineUsers.delete(globalUser);
-      }
-      io.emit('global user list', getGlobalUserList());
-    }
+
+    // Broadcast room leave if was in a room
+    if (p.room) broadcastRoom(p.room);
+    io.emit('global user list', getGlobalUserList());
   });
-
-  function leaveCurrentRoom() {
-    const room = rooms.get(currentRoom);
-    if (!room || !roomUser) return;
-
-    const count = room.users.get(roomUser) || 0;
-    if (count <= 1) {
-      room.users.delete(roomUser);
-    } else {
-      room.users.set(roomUser, count - 1);
-    }
-
-    socket.leave(currentRoom);
-    const list = getUserList(room);
-    io.to(currentRoom).emit('online', list.length);
-    io.to(currentRoom).emit('user list', list);
-    io.emit('room list', getRoomList());
-  }
 });
 
-function getUserList(room) {
-  return Array.from(room.users.keys()).filter(n => n).sort().map(name => ({ name }));
+// Broadcast updated user list and count to a room
+function broadcastRoom(roomName) {
+  const list = getRoomUserList(roomName);
+  io.to(roomName).emit('online', list.length);
+  io.to(roomName).emit('user list', list);
+  io.emit('room list', getRoomList());
 }
 
+// Get unique sorted usernames in a room
+function getRoomUserList(roomName) {
+  const seen = new Set();
+  const result = [];
+  for (const [, p] of presence) {
+    if (p.room === roomName && !seen.has(p.username)) {
+      seen.add(p.username);
+      result.push(p.username);
+    }
+  }
+  return result.sort().map(name => ({ name }));
+}
+
+// Get unique sorted usernames globally
 function getGlobalUserList() {
-  return Array.from(onlineUsers.keys()).sort().map(name => ({ name }));
+  return Array.from(users.keys()).sort().map(name => ({ name }));
 }
 
+// Get room list with online counts
 function getRoomList() {
   const list = [];
   for (const [name, room] of rooms) {
     list.push({
       name,
       hasPassword: !!room.password,
-      onlineCount: room.users.size,
+      onlineCount: getRoomUserList(name).length,
       messageCount: room.messages.length
     });
   }
