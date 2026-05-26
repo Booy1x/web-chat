@@ -56,15 +56,14 @@
         <span id="currentUser"></span>
         <span id="chatRoomName"></span>
         <div class="header-right">
-          <span id="onlineCount">online: 0</span>
+          <div id="onlineDropdown" class="dropdown">
+            <span id="onlineCount" class="dropdown-toggle">online: 0</span>
+            <div id="roomUserList" class="dropdown-menu"></div>
+          </div>
           <button id="leaveBtn" onclick="leaveRoom()">leave</button>
         </div>
       </div>
       <div id="chatBody">
-        <div id="userSidebar">
-          <div class="sidebar-title">> users</div>
-          <div id="userList"></div>
-        </div>
         <div id="messages"></div>
       </div>
       <div id="inputBar">

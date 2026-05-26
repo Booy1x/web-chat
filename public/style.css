@@ -162,23 +162,6 @@ body {
   overflow: hidden;
 }
 
-#userSidebar {
-  width: 140px;
-  border-right: 1px solid var(--border);
-  background: var(--bg-lighter);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  flex-shrink: 0;
-}
-
-#userSidebar .sidebar-title {
-  padding: 8px 10px;
-  color: var(--fg-dim);
-  font-size: 11px;
-  border-bottom: 1px solid var(--border);
-}
-
 .user-item {
   display: flex;
   align-items: center;
@@ -224,6 +207,38 @@ body {
 #onlineCount {
   color: var(--fg-dim);
   font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+#onlineCount:hover {
+  color: var(--fg);
+  background: var(--bg-light);
+}
+
+/* ── Online Dropdown ── */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 140px;
+  background: var(--bg-lighter);
+  border: 1px solid var(--border);
+  z-index: 100;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.dropdown-menu.open {
+  display: block;
 }
 
 #status {
@@ -571,10 +586,6 @@ body {
 
   #inputBar {
     padding-bottom: max(8px, env(safe-area-inset-bottom));
-  }
-
-  #userSidebar {
-    display: none;
   }
 
   #globalSidebar {

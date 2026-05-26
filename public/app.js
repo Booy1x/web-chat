@@ -1,6 +1,7 @@
 let socket;
 let myName = '';
 let currentRoom = '';
+let roomPassword = '';
 let kicked = false;
 
 // ── Login ──
@@ -28,7 +29,7 @@ async function login() {
   kicked = false;
 
   // Connect socket for global online tracking
-  socket = io();
+  socket = io({ auth: { code } });
   socket.emit('set username', myName);
   socket.on('global user list', (users) => {
     renderGlobalUserList(users);
@@ -38,6 +39,12 @@ async function login() {
     alert('Your account was logged in from another location');
     logout();
   });
+  socket.on('connect_error', (err) => {
+    if (err.message === 'access denied') {
+      alert('Access denied');
+      logout();
+    }
+  });
 
   showRoomList();
 }
@@ -46,6 +53,7 @@ function logout() {
   if (socket) { socket.disconnect(); socket = null; }
   myName = '';
   currentRoom = '';
+  roomPassword = '';
   localStorage.removeItem('chatRoom');
   document.getElementById('roomList').style.display = 'none';
   document.getElementById('chat').style.display = 'none';
@@ -83,7 +91,7 @@ function renderRoomList(rooms) {
   container.innerHTML = rooms.map(r => {
     const lock = r.hasPassword ? ' [locked]' : '';
     const info = `${r.onlineCount} online, ${r.messageCount} msgs`;
-    return `<div class="room-item" onclick="joinRoom('${escapeAttr(r.name)}')">
+    return `<div class="room-item" data-name="${escapeAttr(r.name)}">
       <span class="room-name">${escapeHtml(r.name)}${lock}</span>
       <span class="room-info">${info}</span>
     </div>`;
@@ -119,9 +127,14 @@ async function createRoom() {
 
   if (!name) { errEl.textContent = '> error: room name required'; return; }
 
+  // Remove previous listeners to avoid leak
+  socket.off('room list');
+  socket.off('room error');
+
   socket.emit('create room', { name, password });
 
   socket.once('room list', (rooms) => {
+    socket.off('room error');
     renderRoomList(rooms);
     document.getElementById('newRoomName').value = '';
     document.getElementById('newRoomPass').value = '';
@@ -129,12 +142,14 @@ async function createRoom() {
   });
 
   socket.once('room error', (msg) => {
+    socket.off('room list');
     errEl.textContent = '> error: ' + msg;
   });
 }
 
 function connectAndJoin(name, password) {
   currentRoom = name;
+  roomPassword = password;
   localStorage.setItem('chatRoom', name);
 
   // Remove previous room listeners to avoid duplicates
@@ -193,13 +208,13 @@ function connectAndJoin(name, password) {
   });
 
   socket.on('reconnect', () => {
-    if (!kicked) socket.emit('join room', { name: currentRoom, password: '', user: myName });
+    if (!kicked) socket.emit('join room', { name: currentRoom, password: roomPassword, user: myName });
   });
 }
 
 // ── User List ──
 function renderUserList(users) {
-  const container = document.getElementById('userList');
+  const container = document.getElementById('roomUserList');
   container.innerHTML = users.map(u =>
     `<div class="user-item${u.name === myName ? ' me' : ''}">
       <span class="user-dot"></span>
@@ -220,6 +235,7 @@ function renderGlobalUserList(users) {
 }
 
 function leaveRoom() {
+  document.getElementById('roomUserList').classList.remove('open');
   if (socket) {
     socket.emit('leave room');
     socket.off('room joined');
@@ -232,6 +248,7 @@ function leaveRoom() {
     socket.off('reconnect');
   }
   currentRoom = '';
+  roomPassword = '';
   localStorage.removeItem('chatRoom');
   document.getElementById('chat').style.display = 'none';
   document.getElementById('messages').innerHTML = '';
@@ -280,13 +297,29 @@ function escapeHtml(str) {
 }
 
 function escapeAttr(str) {
-  return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function scrollToBottom() {
   const el = document.getElementById('messages');
   el.scrollTop = el.scrollHeight;
 }
+
+// ── Event Delegation ──
+document.getElementById('roomItems').addEventListener('click', (e) => {
+  const item = e.target.closest('.room-item');
+  if (item) joinRoom(item.dataset.name);
+});
+
+// ── Online Dropdown ──
+document.getElementById('onlineCount').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('roomUserList').classList.toggle('open');
+});
+
+document.addEventListener('click', () => {
+  document.getElementById('roomUserList').classList.remove('open');
+});
 
 // ── Keyboard ──
 document.getElementById('nameInput').addEventListener('keydown', (e) => {
