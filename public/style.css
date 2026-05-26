@@ -455,6 +455,40 @@ body {
 
 /* ── Mobile ── */
 @media (max-width: 500px) {
-  body { align-items: flex-start; }
-  #app { max-height: 100vh; border: none; }
+  body {
+    align-items: flex-start;
+    height: 100dvh;
+  }
+
+  #app {
+    max-height: 100dvh;
+    height: 100dvh;
+    border: none;
+  }
+
+  #login .ascii-art {
+    font-size: 7px;
+    line-height: 1.1;
+  }
+
+  #login input,
+  #login button {
+    max-width: 100%;
+  }
+
+  #login .prompt-line {
+    max-width: 100%;
+  }
+
+  #createRoom .create-row {
+    flex-wrap: wrap;
+  }
+
+  #createRoom input {
+    min-width: 0;
+  }
+
+  #inputBar {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
 }
