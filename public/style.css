@@ -30,6 +30,35 @@ body {
   font-size: 13px;
 }
 
+/* ── Global Sidebar ── */
+#globalSidebar {
+  width: 160px;
+  height: 100vh;
+  max-height: 700px;
+  background: var(--bg-lighter);
+  border: 1px solid var(--border);
+  border-right: none;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+#globalSidebar .sidebar-title {
+  padding: 8px 10px;
+  color: var(--fg-dim);
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+}
+
+#globalSidebar .online-count {
+  padding: 6px 10px;
+  color: var(--fg-dim);
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+
 #app {
   width: 100%;
   max-width: 560px;
@@ -546,5 +575,9 @@ body {
 
   #userSidebar {
     display: none;
+  }
+
+  #globalSidebar {
+    display: none !important;
   }
 }

@@ -24,6 +24,14 @@ async function login() {
 
   errEl.textContent = '';
   myName = name;
+
+  // Connect socket for global online tracking
+  socket = io();
+  socket.emit('set username', myName);
+  socket.on('global user list', (users) => {
+    renderGlobalUserList(users);
+  });
+
   showRoomList();
 }
 
@@ -33,7 +41,9 @@ function logout() {
   currentRoom = '';
   localStorage.removeItem('chatRoom');
   document.getElementById('roomList').style.display = 'none';
+  document.getElementById('chat').style.display = 'none';
   document.getElementById('login').style.display = 'flex';
+  document.getElementById('globalSidebar').style.display = 'none';
   document.getElementById('nameInput').value = '';
   document.getElementById('codeInput').value = '';
   document.getElementById('nameInput').focus();
@@ -44,6 +54,7 @@ async function showRoomList() {
   document.getElementById('login').style.display = 'none';
   document.getElementById('chat').style.display = 'none';
   document.getElementById('roomList').style.display = 'flex';
+  document.getElementById('globalSidebar').style.display = 'flex';
   document.getElementById('roomUser').textContent = myName + '@chat';
 
   try {
@@ -101,37 +112,40 @@ async function createRoom() {
 
   if (!name) { errEl.textContent = '> error: room name required'; return; }
 
-  const tmpSocket = io();
-  tmpSocket.emit('create room', { name, password });
+  socket.emit('create room', { name, password });
 
-  tmpSocket.on('room list', (rooms) => {
+  socket.once('room list', (rooms) => {
     renderRoomList(rooms);
     document.getElementById('newRoomName').value = '';
     document.getElementById('newRoomPass').value = '';
     errEl.textContent = '';
-    tmpSocket.disconnect();
   });
 
-  tmpSocket.on('room error', (msg) => {
+  socket.once('room error', (msg) => {
     errEl.textContent = '> error: ' + msg;
-    tmpSocket.disconnect();
   });
 }
 
 function connectAndJoin(name, password) {
-  if (socket) { socket.disconnect(); }
-
-  socket = io();
   currentRoom = name;
   localStorage.setItem('chatRoom', name);
 
-  socket.on('connect', () => {
-    socket.emit('join room', { name, password, user: myName });
-  });
+  // Remove previous room listeners to avoid duplicates
+  socket.off('room joined');
+  socket.off('room error');
+  socket.off('chat message');
+  socket.off('online');
+  socket.off('user list');
+  socket.off('error_msg');
+  socket.off('disconnect');
+  socket.off('reconnect');
+
+  socket.emit('join room', { name, password, user: myName });
 
   socket.on('room joined', (data) => {
     document.getElementById('roomList').style.display = 'none';
     document.getElementById('chat').style.display = 'flex';
+    document.getElementById('globalSidebar').style.display = 'flex';
     document.getElementById('currentUser').textContent = myName + '@chat';
     document.getElementById('chatRoomName').textContent = data.name;
     document.getElementById('messages').innerHTML = '';
@@ -145,8 +159,6 @@ function connectAndJoin(name, password) {
 
   socket.on('room error', (msg) => {
     alert(msg);
-    socket.disconnect();
-    socket = null;
     currentRoom = '';
     localStorage.removeItem('chatRoom');
     showRoomList();
@@ -189,11 +201,28 @@ function renderUserList(users) {
   ).join('');
 }
 
+function renderGlobalUserList(users) {
+  const container = document.getElementById('globalUserList');
+  container.innerHTML = users.map(u =>
+    `<div class="user-item${u.name === myName ? ' me' : ''}">
+      <span class="user-dot"></span>
+      <span class="user-name">${escapeHtml(u.name)}</span>
+    </div>`
+  ).join('');
+  document.getElementById('globalOnlineCount').textContent = users.length + ' online';
+}
+
 function leaveRoom() {
   if (socket) {
     socket.emit('leave room');
-    socket.disconnect();
-    socket = null;
+    socket.off('room joined');
+    socket.off('room error');
+    socket.off('chat message');
+    socket.off('online');
+    socket.off('user list');
+    socket.off('error_msg');
+    socket.off('disconnect');
+    socket.off('reconnect');
   }
   currentRoom = '';
   localStorage.removeItem('chatRoom');

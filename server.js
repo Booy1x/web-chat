@@ -19,6 +19,9 @@ redis.on('error', (err) => console.error('Redis error:', err.message));
 // Each room: { name, password, messages[], users: Map<username, connectionCount> }
 let rooms = new Map();
 
+// Global online users: Map<username, Set<socketId>>
+let onlineUsers = new Map();
+
 async function loadRooms() {
   const data = await redis.hgetall('rooms');
   for (const [name, json] of Object.entries(data)) {
@@ -71,13 +74,26 @@ app.get('/api/rooms', (req, res) => {
 // Socket.IO
 io.on('connection', (socket) => {
   let currentRoom = null;
-  let userName = null;
+  let roomUser = null;  // username in current room
+  let globalUser = null; // username for global tracking
 
   if (io.engine.clientsCount > MAX_CONNECTIONS) {
     socket.emit('error_msg', 'server is full');
     socket.disconnect(true);
     return;
   }
+
+  // Register user globally on login
+  socket.on('set username', (name) => {
+    name = (name || '').trim();
+    if (!name) return;
+    globalUser = name;
+    if (!onlineUsers.has(name)) {
+      onlineUsers.set(name, new Set());
+    }
+    onlineUsers.get(name).add(socket.id);
+    io.emit('global user list', getGlobalUserList());
+  });
 
   socket.on('create room', async ({ name, password }) => {
     name = (name || '').trim();
@@ -102,13 +118,13 @@ io.on('connection', (socket) => {
       leaveCurrentRoom();
     }
 
-    userName = (user || '').trim();
+    roomUser = (user || '').trim();
     currentRoom = name;
     socket.join(name);
 
     // Track user in room
-    const count = room.users.get(userName) || 0;
-    room.users.set(userName, count + 1);
+    const count = room.users.get(roomUser) || 0;
+    room.users.set(roomUser, count + 1);
 
     socket.emit('room joined', {
       name,
@@ -125,7 +141,7 @@ io.on('connection', (socket) => {
     if (!currentRoom) return;
     leaveCurrentRoom();
     currentRoom = null;
-    userName = null;
+    roomUser = null;
   });
 
   socket.on('chat message', async (data) => {
@@ -149,17 +165,26 @@ io.on('connection', (socket) => {
     if (currentRoom) {
       leaveCurrentRoom();
     }
+    // Remove from global online users
+    if (globalUser && onlineUsers.has(globalUser)) {
+      const sockets = onlineUsers.get(globalUser);
+      sockets.delete(socket.id);
+      if (sockets.size === 0) {
+        onlineUsers.delete(globalUser);
+      }
+      io.emit('global user list', getGlobalUserList());
+    }
   });
 
   function leaveCurrentRoom() {
     const room = rooms.get(currentRoom);
-    if (!room || !userName) return;
+    if (!room || !roomUser) return;
 
-    const count = room.users.get(userName) || 0;
+    const count = room.users.get(roomUser) || 0;
     if (count <= 1) {
-      room.users.delete(userName);
+      room.users.delete(roomUser);
     } else {
-      room.users.set(userName, count - 1);
+      room.users.set(roomUser, count - 1);
     }
 
     socket.leave(currentRoom);
@@ -171,6 +196,10 @@ io.on('connection', (socket) => {
 
 function getUserList(room) {
   return Array.from(room.users.keys()).sort().map(name => ({ name }));
+}
+
+function getGlobalUserList() {
+  return Array.from(onlineUsers.keys()).sort().map(name => ({ name }));
 }
 
 function getRoomList() {
