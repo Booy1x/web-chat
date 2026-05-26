@@ -1,6 +1,7 @@
 let socket;
 let myName = '';
 let currentRoom = '';
+let kicked = false;
 
 // ── Login ──
 async function login() {
@@ -24,6 +25,7 @@ async function login() {
 
   errEl.textContent = '';
   myName = name;
+  kicked = false;
 
   // Connect socket for global online tracking
   socket = io();
@@ -32,6 +34,7 @@ async function login() {
     renderGlobalUserList(users);
   });
   socket.on('kicked', () => {
+    kicked = true;
     alert('Your account was logged in from another location');
     logout();
   });
@@ -186,11 +189,11 @@ function connectAndJoin(name, password) {
   });
 
   socket.on('disconnect', () => {
-    appendSystemMsg('disconnected. reconnecting...');
+    if (!kicked) appendSystemMsg('disconnected. reconnecting...');
   });
 
   socket.on('reconnect', () => {
-    socket.emit('join room', { name: currentRoom, password: '', user: myName });
+    if (!kicked) socket.emit('join room', { name: currentRoom, password: '', user: myName });
   });
 }
 

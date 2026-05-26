@@ -115,8 +115,7 @@ io.on('connection', (socket) => {
 
     const p = presence.get(socket.id);
     if (!p) return socket.emit('room error', 'not logged in');
-    const roomUser = (user || '').trim();
-    if (!roomUser) return socket.emit('room error', 'username required');
+    if (!(user || '').trim()) return socket.emit('room error', 'username required');
 
     // Leave previous room
     if (p.room) {
