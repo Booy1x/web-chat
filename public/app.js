@@ -78,7 +78,7 @@ async function joinRoom(name) {
 
   if (room && room.hasPassword) {
     password = prompt(`password for "${name}":`);
-    if (password === null) return; // cancelled
+    if (password === null) return;
   }
 
   connectAndJoin(name, password);
@@ -101,7 +101,6 @@ async function createRoom() {
 
   if (!name) { errEl.textContent = '> error: room name required'; return; }
 
-  // Need a temporary socket to create the room
   const tmpSocket = io();
   tmpSocket.emit('create room', { name, password });
 
@@ -127,7 +126,7 @@ function connectAndJoin(name, password) {
   localStorage.setItem('chatRoom', name);
 
   socket.on('connect', () => {
-    socket.emit('join room', { name, password });
+    socket.emit('join room', { name, password, user: myName });
   });
 
   socket.on('room joined', (data) => {
@@ -140,6 +139,8 @@ function connectAndJoin(name, password) {
 
     data.messages.forEach(m => appendMsg(m.user, m.content, m.created_at));
     scrollToBottom();
+
+    if (data.users) renderUserList(data.users);
   });
 
   socket.on('room error', (msg) => {
@@ -160,6 +161,10 @@ function connectAndJoin(name, password) {
     document.getElementById('onlineCount').textContent = 'online: ' + count;
   });
 
+  socket.on('user list', (users) => {
+    renderUserList(users);
+  });
+
   socket.on('error_msg', (msg) => {
     appendSystemMsg(msg);
   });
@@ -169,8 +174,19 @@ function connectAndJoin(name, password) {
   });
 
   socket.on('reconnect', () => {
-    socket.emit('join room', { name: currentRoom, password: '' });
+    socket.emit('join room', { name: currentRoom, password: '', user: myName });
   });
+}
+
+// ── User List ──
+function renderUserList(users) {
+  const container = document.getElementById('userList');
+  container.innerHTML = users.map(u =>
+    `<div class="user-item${u.name === myName ? ' me' : ''}">
+      <span class="user-dot"></span>
+      <span class="user-name">${escapeHtml(u.name)}</span>
+    </div>`
+  ).join('');
 }
 
 function leaveRoom() {

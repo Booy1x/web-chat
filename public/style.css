@@ -127,6 +127,57 @@ body {
   height: 100%;
 }
 
+#chatBody {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+#userSidebar {
+  width: 140px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-lighter);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+#userSidebar .sidebar-title {
+  padding: 8px 10px;
+  color: var(--fg-dim);
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+}
+
+.user-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.user-item .user-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+
+.user-item .user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-item.me .user-name {
+  color: var(--cyan);
+  font-weight: 600;
+}
+
 #header {
   padding: 8px 12px;
   background: var(--bg-lighter);
@@ -490,5 +541,9 @@ body {
 
   #inputBar {
     padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  #userSidebar {
+    display: none;
   }
 }

@@ -53,7 +53,13 @@
           <button id="leaveBtn" onclick="leaveRoom()">leave</button>
         </div>
       </div>
-      <div id="messages"></div>
+      <div id="chatBody">
+        <div id="userSidebar">
+          <div class="sidebar-title">> users</div>
+          <div id="userList"></div>
+        </div>
+        <div id="messages"></div>
+      </div>
       <div id="inputBar">
         <span class="prompt-symbol">$</span>
         <input id="msgInput" placeholder="type a message..." maxlength="500">

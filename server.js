@@ -15,14 +15,15 @@ const io = new Server(server);
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 redis.on('error', (err) => console.error('Redis error:', err.message));
 
-// In-memory room cache: Map<string, { name, password, messages[], onlineCount }>
+// In-memory room cache
+// Each room: { name, password, messages[], users: Map<username, connectionCount> }
 let rooms = new Map();
 
 async function loadRooms() {
   const data = await redis.hgetall('rooms');
   for (const [name, json] of Object.entries(data)) {
     const room = JSON.parse(json);
-    room.onlineCount = 0;
+    room.users = new Map();
     rooms.set(name, room);
   }
   console.log(`Loaded ${rooms.size} rooms from Redis`);
@@ -31,15 +32,14 @@ async function loadRooms() {
 async function saveRoom(name) {
   const room = rooms.get(name);
   if (!room) return;
-  const { onlineCount, ...data } = room;
+  const { users, ...data } = room;
   await redis.hset('rooms', name, JSON.stringify(data));
 }
 
 async function init() {
   await loadRooms();
-  // Default room
   if (!rooms.has('general')) {
-    rooms.set('general', { name: 'general', password: '', messages: [], onlineCount: 0 });
+    rooms.set('general', { name: 'general', password: '', messages: [], users: new Map() });
     await saveRoom('general');
   }
 }
@@ -61,7 +61,7 @@ app.get('/api/rooms', (req, res) => {
     list.push({
       name,
       hasPassword: !!room.password,
-      onlineCount: room.onlineCount,
+      onlineCount: room.users.size,
       messageCount: room.messages.length
     });
   }
@@ -71,6 +71,7 @@ app.get('/api/rooms', (req, res) => {
 // Socket.IO
 io.on('connection', (socket) => {
   let currentRoom = null;
+  let userName = null;
 
   if (io.engine.clientsCount > MAX_CONNECTIONS) {
     socket.emit('error_msg', 'server is full');
@@ -84,12 +85,12 @@ io.on('connection', (socket) => {
     if (name.length > 30) return socket.emit('room error', 'name too long (max 30)');
     if (rooms.has(name)) return socket.emit('room error', 'room already exists');
 
-    rooms.set(name, { name, password: password || '', messages: [], onlineCount: 0 });
+    rooms.set(name, { name, password: password || '', messages: [], users: new Map() });
     await saveRoom(name);
     io.emit('room list', getRoomList());
   });
 
-  socket.on('join room', async ({ name, password }) => {
+  socket.on('join room', async ({ name, password, user }) => {
     const room = rooms.get(name);
     if (!room) return socket.emit('room error', 'room not found');
     if (room.password && room.password !== password) {
@@ -98,37 +99,33 @@ io.on('connection', (socket) => {
 
     // Leave previous room
     if (currentRoom) {
-      socket.leave(currentRoom);
-      const prev = rooms.get(currentRoom);
-      if (prev) {
-        prev.onlineCount = Math.max(0, prev.onlineCount - 1);
-        io.to(currentRoom).emit('online', prev.onlineCount);
-      }
+      leaveCurrentRoom();
     }
 
+    userName = (user || '').trim();
     currentRoom = name;
     socket.join(name);
-    room.onlineCount++;
+
+    // Track user in room
+    const count = room.users.get(userName) || 0;
+    room.users.set(userName, count + 1);
 
     socket.emit('room joined', {
       name,
       messages: room.messages.slice(-100),
-      onlineCount: room.onlineCount
+      onlineCount: room.users.size,
+      users: getUserList(room)
     });
-    io.to(name).emit('online', room.onlineCount);
+    io.to(name).emit('online', room.users.size);
+    io.to(name).emit('user list', getUserList(room));
     io.emit('room list', getRoomList());
   });
 
   socket.on('leave room', () => {
     if (!currentRoom) return;
-    const room = rooms.get(currentRoom);
-    if (room) {
-      room.onlineCount = Math.max(0, room.onlineCount - 1);
-      io.to(currentRoom).emit('online', room.onlineCount);
-    }
-    socket.leave(currentRoom);
+    leaveCurrentRoom();
     currentRoom = null;
-    io.emit('room list', getRoomList());
+    userName = null;
   });
 
   socket.on('chat message', async (data) => {
@@ -150,14 +147,31 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     if (currentRoom) {
-      const room = rooms.get(currentRoom);
-      if (room) {
-        room.onlineCount = Math.max(0, room.onlineCount - 1);
-        io.to(currentRoom).emit('online', room.onlineCount);
-      }
+      leaveCurrentRoom();
     }
   });
+
+  function leaveCurrentRoom() {
+    const room = rooms.get(currentRoom);
+    if (!room || !userName) return;
+
+    const count = room.users.get(userName) || 0;
+    if (count <= 1) {
+      room.users.delete(userName);
+    } else {
+      room.users.set(userName, count - 1);
+    }
+
+    socket.leave(currentRoom);
+    io.to(currentRoom).emit('online', room.users.size);
+    io.to(currentRoom).emit('user list', getUserList(room));
+    io.emit('room list', getRoomList());
+  }
 });
+
+function getUserList(room) {
+  return Array.from(room.users.keys()).sort().map(name => ({ name }));
+}
 
 function getRoomList() {
   const list = [];
@@ -165,7 +179,7 @@ function getRoomList() {
     list.push({
       name,
       hasPassword: !!room.password,
-      onlineCount: room.onlineCount,
+      onlineCount: room.users.size,
       messageCount: room.messages.length
     });
   }
