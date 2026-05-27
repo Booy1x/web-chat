@@ -167,6 +167,24 @@ io.on('connection', (socket) => {
     await saveRoom(p.room);
   });
 
+  socket.on('clear messages', async (roomName) => {
+    const room = rooms.get(roomName);
+    if (!room) return;
+    room.messages = [];
+    await saveRoom(roomName);
+    io.to(roomName).emit('messages cleared');
+    io.emit('room list', getRoomList());
+  });
+
+  socket.on('delete room', async (roomName) => {
+    if (roomName === 'general') return socket.emit('room error', 'cannot delete general');
+    if (!rooms.has(roomName)) return;
+    rooms.delete(roomName);
+    await redis.hdel('rooms', roomName);
+    io.to(roomName).emit('room deleted');
+    io.emit('room list', getRoomList());
+  });
+
   socket.on('disconnect', () => {
     const p = presence.get(socket.id);
     if (!p) return;

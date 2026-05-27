@@ -461,6 +461,36 @@ body {
   font-size: 11px;
 }
 
+.room-actions {
+  display: none;
+  gap: 4px;
+}
+
+.room-item:hover .room-actions {
+  display: flex;
+}
+
+.room-actions button {
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+
+.btn-clear:hover {
+  color: var(--yellow);
+  border-color: var(--yellow);
+}
+
+.btn-delete:hover {
+  color: var(--red);
+  border-color: var(--red);
+}
+
 .room-empty {
   color: var(--fg-dim);
   padding: 16px;

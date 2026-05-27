@@ -91,11 +91,26 @@ function renderRoomList(rooms) {
   container.innerHTML = rooms.map(r => {
     const lock = r.hasPassword ? ' [locked]' : '';
     const info = `${r.onlineCount} online, ${r.messageCount} msgs`;
+    const canDelete = r.name !== 'general';
     return `<div class="room-item" data-name="${escapeAttr(r.name)}">
       <span class="room-name">${escapeHtml(r.name)}${lock}</span>
       <span class="room-info">${info}</span>
+      ${canDelete ? `<span class="room-actions">
+        <button class="btn-clear" title="clear messages">clear</button>
+        <button class="btn-delete" title="delete room">delete</button>
+      </span>` : ''}
     </div>`;
   }).join('');
+}
+
+function clearMessages(roomName) {
+  if (!confirm(`Clear all messages in #${roomName}?`)) return;
+  socket.emit('clear messages', roomName);
+}
+
+function deleteRoom(roomName) {
+  if (!confirm(`Delete room #${roomName}? This cannot be undone.`)) return;
+  socket.emit('delete room', roomName);
 }
 
 async function joinRoom(name) {
@@ -210,6 +225,16 @@ function connectAndJoin(name, password) {
   socket.on('reconnect', () => {
     if (!kicked) socket.emit('join room', { name: currentRoom, password: roomPassword, user: myName });
   });
+
+  socket.on('room deleted', () => {
+    alert('This room has been deleted');
+    leaveRoom();
+  });
+
+  socket.on('messages cleared', () => {
+    document.getElementById('messages').innerHTML = '';
+    appendSystemMsg('messages cleared');
+  });
 }
 
 // ── User List ──
@@ -246,6 +271,8 @@ function leaveRoom() {
     socket.off('error_msg');
     socket.off('disconnect');
     socket.off('reconnect');
+    socket.off('room deleted');
+    socket.off('messages cleared');
   }
   currentRoom = '';
   roomPassword = '';
@@ -307,8 +334,19 @@ function scrollToBottom() {
 
 // ── Event Delegation ──
 document.getElementById('roomItems').addEventListener('click', (e) => {
-  const item = e.target.closest('.room-item');
-  if (item) joinRoom(item.dataset.name);
+  const clearBtn = e.target.closest('.btn-clear');
+  const deleteBtn = e.target.closest('.btn-delete');
+
+  if (clearBtn) {
+    e.stopPropagation();
+    clearMessages(clearBtn.closest('.room-item').dataset.name);
+  } else if (deleteBtn) {
+    e.stopPropagation();
+    deleteRoom(deleteBtn.closest('.room-item').dataset.name);
+  } else {
+    const item = e.target.closest('.room-item');
+    if (item) joinRoom(item.dataset.name);
+  }
 });
 
 // ── Online Dropdown ──
