@@ -62,7 +62,7 @@ function termConfirm(msg) {
   });
 }
 
-function termPrompt(msg, placeholder) {
+function termPrompt(msg, placeholder, isPassword) {
   return new Promise(resolve => {
     const overlay = document.getElementById('termDialog');
     const msgEl = document.getElementById('termDialogMsg');
@@ -72,6 +72,7 @@ function termPrompt(msg, placeholder) {
 
     msgEl.textContent = msg;
     input.style.display = 'block';
+    input.type = isPassword ? 'password' : 'text';
     input.placeholder = placeholder || '';
     input.value = '';
     cancelBtn.style.display = 'inline-block';
@@ -221,7 +222,7 @@ async function joinRoom(name) {
   let password = '';
 
   if (room && room.hasPassword) {
-    password = await termPrompt(`password for "${name}":`, 'enter password');
+    password = await termPrompt(`password for "${name}":`, 'enter password', true);
     if (password === null) return;
   }
 
