@@ -3,9 +3,20 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const Redis = require('ioredis');
+const crypto = require('crypto');
 
 const MAX_CONNECTIONS = 10;
 const ACCESS_CODE = process.env.ACCESS_CODE || '';
+
+// Password hashing
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function verifyPassword(password, hash) {
+  const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(passwordHash), Buffer.from(hash));
+}
 
 // Rate limiting for /api/verify
 const MAX_FAILS = 5;
@@ -89,7 +100,14 @@ app.get('/api/rooms', (req, res) => {
   res.json(getRoomList());
 });
 
-// Socket.IO
+// Socket.IO - authenticate connection
+io.use((socket, next) => {
+  if (!ACCESS_CODE) return next();
+  const code = socket.handshake.auth.code;
+  if (code === ACCESS_CODE) return next();
+  next(new Error('access denied'));
+});
+
 io.on('connection', (socket) => {
   if (io.engine.clientsCount > MAX_CONNECTIONS) {
     socket.emit('error_msg', 'server is full');
@@ -99,7 +117,7 @@ io.on('connection', (socket) => {
 
   // Register user globally, kick duplicate logins
   socket.on('set username', (name) => {
-    name = (name || '').trim();
+    name = (name || '').trim().slice(0, 20);
     if (!name) return;
 
     // Kick old sockets with same username
@@ -128,7 +146,8 @@ io.on('connection', (socket) => {
     if (name.length > 30) return socket.emit('room error', 'name too long (max 30)');
     if (rooms.has(name)) return socket.emit('room error', 'room already exists');
 
-    rooms.set(name, { name, password: password || '', messages: [] });
+    const hashedPassword = password ? hashPassword(password) : '';
+    rooms.set(name, { name, password: hashedPassword, messages: [] });
     await saveRoom(name);
     io.emit('room list', getRoomList());
   });
@@ -136,7 +155,7 @@ io.on('connection', (socket) => {
   socket.on('join room', async ({ name, password, user }) => {
     const room = rooms.get(name);
     if (!room) return socket.emit('room error', 'room not found');
-    if (room.password && room.password !== password) {
+    if (room.password && (!password || !verifyPassword(password, room.password))) {
       return socket.emit('room error', 'wrong password');
     }
 
@@ -179,8 +198,8 @@ io.on('connection', (socket) => {
   socket.on('chat message', async (data) => {
     const p = presence.get(socket.id);
     if (!p || !p.room) return socket.emit('error_msg', 'join a room first');
-    const user = (data.user || '').trim();
-    const content = (data.content || '').trim();
+    const user = (data.user || '').trim().slice(0, 20);
+    const content = (data.content || '').trim().slice(0, 1000);
     if (!user || !content) return;
 
     const room = rooms.get(p.room);
