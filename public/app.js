@@ -106,11 +106,23 @@ function renderRoomList(rooms) {
 function clearMessages(roomName) {
   if (!confirm(`Clear all messages in #${roomName}?`)) return;
   socket.emit('clear messages', roomName);
+  // Optimistic: if currently in this room, clear messages immediately
+  if (currentRoom === roomName) {
+    document.getElementById('messages').innerHTML = '';
+    appendSystemMsg('messages cleared');
+  }
 }
 
 function deleteRoom(roomName) {
   if (!confirm(`Delete room #${roomName}? This cannot be undone.`)) return;
   socket.emit('delete room', roomName);
+  // Optimistic: remove from list immediately
+  const item = document.querySelector(`.room-item[data-name="${CSS.escape(roomName)}"]`);
+  if (item) item.remove();
+  // If currently in this room, leave
+  if (currentRoom === roomName) {
+    leaveRoom();
+  }
 }
 
 async function joinRoom(name) {
