@@ -111,7 +111,10 @@ async function login() {
       body: JSON.stringify({ code })
     });
     const data = await res.json();
-    if (!data.ok) { errEl.textContent = '> error: access denied'; return; }
+    if (!data.ok) {
+      errEl.textContent = data.error ? `> error: ${data.error}` : '> error: access denied';
+      return;
+    }
   } catch (e) {
     errEl.textContent = '> error: connection failed'; return;
   }

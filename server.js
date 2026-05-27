@@ -7,6 +7,11 @@ const Redis = require('ioredis');
 const MAX_CONNECTIONS = 10;
 const ACCESS_CODE = process.env.ACCESS_CODE || '';
 
+// Rate limiting for /api/verify
+const MAX_FAILS = 5;
+const BAN_DURATION = 5 * 60 * 1000; // 5 minutes
+const verifyFails = new Map(); // ip -> { count, bannedUntil }
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -54,7 +59,29 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.post('/api/verify', (req, res) => {
   if (!ACCESS_CODE) return res.json({ ok: true });
-  if (req.body.code === ACCESS_CODE) return res.json({ ok: true });
+
+  const ip = req.ip;
+  const record = verifyFails.get(ip);
+
+  // Check if banned
+  if (record && record.bannedUntil > Date.now()) {
+    const remainSec = Math.ceil((record.bannedUntil - Date.now()) / 1000);
+    return res.status(429).json({ ok: false, error: `too many attempts, try again in ${remainSec}s` });
+  }
+
+  // Check password
+  if (req.body.code === ACCESS_CODE) {
+    verifyFails.delete(ip);
+    return res.json({ ok: true });
+  }
+
+  // Record failure
+  const fails = (record && record.bannedUntil <= Date.now()) ? 1 : (record ? record.count + 1 : 1);
+  verifyFails.set(ip, {
+    count: fails,
+    bannedUntil: fails >= MAX_FAILS ? Date.now() + BAN_DURATION : 0
+  });
+
   res.status(401).json({ ok: false });
 });
 
