@@ -580,6 +580,83 @@ body {
   border-color: var(--fg-dim);
 }
 
+/* ── Terminal Dialog ── */
+.term-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.term-dialog {
+  background: var(--bg-lighter);
+  border: 1px solid var(--border);
+  min-width: 280px;
+  max-width: 360px;
+  padding: 16px;
+}
+
+.term-dialog-header {
+  color: var(--green);
+  font-size: 12px;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.term-dialog-msg {
+  color: var(--fg);
+  font-size: 13px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.term-dialog-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  margin-bottom: 16px;
+}
+
+.term-dialog-input:focus {
+  border-color: var(--accent);
+}
+
+.term-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.term-btn {
+  padding: 6px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+
+.term-btn-ok:hover {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.term-btn-cancel:hover {
+  color: var(--red);
+  border-color: var(--red);
+}
+
 /* ── Mobile ── */
 @media (max-width: 500px) {
   body {

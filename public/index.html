@@ -76,6 +76,19 @@
     </div>
   </div>
 
+  <!-- Terminal Dialog -->
+  <div id="termDialog" class="term-dialog-overlay" style="display:none">
+    <div class="term-dialog">
+      <div class="term-dialog-header">> system</div>
+      <div id="termDialogMsg" class="term-dialog-msg"></div>
+      <input id="termDialogInput" class="term-dialog-input" style="display:none" maxlength="50">
+      <div class="term-dialog-actions">
+        <button id="termDialogOk" class="term-btn term-btn-ok">ok</button>
+        <button id="termDialogCancel" class="term-btn term-btn-cancel" style="display:none">cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
 </body>

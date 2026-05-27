@@ -4,6 +4,97 @@ let currentRoom = '';
 let roomPassword = '';
 let kicked = false;
 
+// ── Terminal Dialog ──
+function termAlert(msg) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('termDialog');
+    const msgEl = document.getElementById('termDialogMsg');
+    const input = document.getElementById('termDialogInput');
+    const okBtn = document.getElementById('termDialogOk');
+    const cancelBtn = document.getElementById('termDialogCancel');
+
+    msgEl.textContent = msg;
+    input.style.display = 'none';
+    cancelBtn.style.display = 'none';
+    overlay.style.display = 'flex';
+
+    const cleanup = () => {
+      overlay.style.display = 'none';
+      okBtn.onclick = null;
+      document.onkeydown = null;
+      resolve();
+    };
+
+    okBtn.onclick = cleanup;
+    document.onkeydown = (e) => { if (e.key === 'Enter') cleanup(); };
+    okBtn.focus();
+  });
+}
+
+function termConfirm(msg) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('termDialog');
+    const msgEl = document.getElementById('termDialogMsg');
+    const input = document.getElementById('termDialogInput');
+    const okBtn = document.getElementById('termDialogOk');
+    const cancelBtn = document.getElementById('termDialogCancel');
+
+    msgEl.textContent = msg;
+    input.style.display = 'none';
+    cancelBtn.style.display = 'inline-block';
+    overlay.style.display = 'flex';
+
+    const cleanup = (result) => {
+      overlay.style.display = 'none';
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      document.onkeydown = null;
+      resolve(result);
+    };
+
+    okBtn.onclick = () => cleanup(true);
+    cancelBtn.onclick = () => cleanup(false);
+    document.onkeydown = (e) => {
+      if (e.key === 'Enter') cleanup(true);
+      if (e.key === 'Escape') cleanup(false);
+    };
+    okBtn.focus();
+  });
+}
+
+function termPrompt(msg, placeholder) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('termDialog');
+    const msgEl = document.getElementById('termDialogMsg');
+    const input = document.getElementById('termDialogInput');
+    const okBtn = document.getElementById('termDialogOk');
+    const cancelBtn = document.getElementById('termDialogCancel');
+
+    msgEl.textContent = msg;
+    input.style.display = 'block';
+    input.placeholder = placeholder || '';
+    input.value = '';
+    cancelBtn.style.display = 'inline-block';
+    overlay.style.display = 'flex';
+
+    const cleanup = (result) => {
+      overlay.style.display = 'none';
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      input.onkeydown = null;
+      resolve(result);
+    };
+
+    okBtn.onclick = () => cleanup(input.value);
+    cancelBtn.onclick = () => cleanup(null);
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') cleanup(input.value);
+      if (e.key === 'Escape') cleanup(null);
+    };
+    input.focus();
+  });
+}
+
 // ── Login ──
 async function login() {
   const name = document.getElementById('nameInput').value.trim();
@@ -34,14 +125,14 @@ async function login() {
   socket.on('global user list', (users) => {
     renderGlobalUserList(users);
   });
-  socket.on('kicked', () => {
+  socket.on('kicked', async () => {
     kicked = true;
-    alert('Your account was logged in from another location');
+    await termAlert('Your account was logged in from another location');
     logout();
   });
-  socket.on('connect_error', (err) => {
+  socket.on('connect_error', async (err) => {
     if (err.message === 'access denied') {
-      alert('Access denied');
+      await termAlert('Access denied');
       logout();
     }
   });
@@ -103,8 +194,8 @@ function renderRoomList(rooms) {
   }).join('');
 }
 
-function clearMessages(roomName) {
-  if (!confirm(`Clear all messages in #${roomName}?`)) return;
+async function clearMessages(roomName) {
+  if (!await termConfirm(`Clear all messages in #${roomName}?`)) return;
   socket.emit('clear messages', roomName);
   // Optimistic: if currently in this room, clear messages immediately
   if (currentRoom === roomName) {
@@ -113,8 +204,8 @@ function clearMessages(roomName) {
   }
 }
 
-function deleteRoom(roomName) {
-  if (!confirm(`Delete room #${roomName}? This cannot be undone.`)) return;
+async function deleteRoom(roomName) {
+  if (!await termConfirm(`Delete room #${roomName}? This cannot be undone.`)) return;
   socket.emit('delete room', roomName);
   // Optimistic: remove from list immediately
   const item = document.querySelector(`.room-item[data-name="${CSS.escape(roomName)}"]`);
@@ -130,7 +221,7 @@ async function joinRoom(name) {
   let password = '';
 
   if (room && room.hasPassword) {
-    password = prompt(`password for "${name}":`);
+    password = await termPrompt(`password for "${name}":`, 'enter password');
     if (password === null) return;
   }
 
@@ -206,8 +297,8 @@ function connectAndJoin(name, password) {
     if (data.users) renderUserList(data.users);
   });
 
-  socket.on('room error', (msg) => {
-    alert(msg);
+  socket.on('room error', async (msg) => {
+    await termAlert(msg);
     currentRoom = '';
     localStorage.removeItem('chatRoom');
     showRoomList();
@@ -238,8 +329,8 @@ function connectAndJoin(name, password) {
     if (!kicked) socket.emit('join room', { name: currentRoom, password: roomPassword, user: myName });
   });
 
-  socket.on('room deleted', () => {
-    alert('This room has been deleted');
+  socket.on('room deleted', async () => {
+    await termAlert('This room has been deleted');
     leaveRoom();
   });
 
